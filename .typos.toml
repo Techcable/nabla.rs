@@ -1,0 +1,9 @@
+[files]
+ignore-hidden = false
+extend-exclude = [
+    ".git", # needed because we 'ignore-hidden'
+]
+
+[default.extend-words]
+# frequent part of hexadecimal
+"ba" = "ba"

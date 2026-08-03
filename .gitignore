@@ -1,0 +1,16 @@
+## Rust
+/target
+# library crate doesn't need a lockfile
+/Cargo.lock
+
+## Python
+__pycache__
+
+## IntelliJ/RustRover
+/.idea
+*.iml
+
+## Miscellaneous
+/.cache
+# scratch directory
+/work

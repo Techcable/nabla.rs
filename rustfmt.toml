@@ -1,0 +1,15 @@
+unstable_features = true
+
+max_width = 120
+style_edition = "2024"
+edition = "2024"
+
+# do not collapse small struct definitions into a single line
+struct_variant_width = 0
+
+imports_granularity = "module"
+reorder_imports = true
+# WARNING: This option is not stable
+#
+# https://github.com/rust-lang/rustfmt/issues/5083
+group_imports = "StdExternalCrate"

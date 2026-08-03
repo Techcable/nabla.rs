@@ -1,0 +1,3 @@
+//! Derive macros for the stdlib (and core/alloc).
+
+pub(crate) mod display;

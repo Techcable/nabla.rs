@@ -1,0 +1,20 @@
+[package]
+name = "nabla"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Derive macros that are both powerful and flexible"
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+nabla-macros.workspace = true
+
+[features]
+# Enable features that require the `alloc` crate
+alloc = []
+# Enable features that require the standard library
+std = ["alloc"]
