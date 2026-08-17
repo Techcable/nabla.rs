@@ -10,6 +10,9 @@ A title is required for publishing a github release, so all versions should have
 
 ## Unreleased
 
+### Added
+- Support `#[derive(From)]` for newtype structs (lvmntwwt)
+
 ## 0.1.0-beta.0
 Initial release with `#[derive(Display)]`
 

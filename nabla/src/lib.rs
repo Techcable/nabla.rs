@@ -71,3 +71,18 @@
 ///
 /// [`thiserror::Error`]: https://docs.rs/thiserror/2/thiserror/derive.Error.html
 pub use nabla_macros::Display;
+
+/// Derive [`core::convert::From`] for newtype structs.
+///
+/// # Examples
+/// ```
+/// extern crate nabla_macros as nabla;
+///
+/// #[derive(nabla::From, Eq, PartialEq, Debug)]
+/// struct Wrapper(u32);
+/// assert_eq!(
+///     <Wrapper as From<u32>>::from(3),
+///     Wrapper(3)
+/// );
+/// ```
+pub use nabla_macros::From;
