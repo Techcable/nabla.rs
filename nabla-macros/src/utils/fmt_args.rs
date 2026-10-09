@@ -1,9 +1,9 @@
 //! Parses format arguments.
 
-use std::cell::Cell;
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter, Write};
-use std::str::FromStr;
+use core::cell::Cell;
+use core::error::Error;
+use core::fmt::{Debug, Display, Formatter, Write};
+use core::str::FromStr;
 
 use darling::ast::NestedMeta;
 use indexmap::IndexMap;
@@ -32,11 +32,8 @@ impl darling::FromMeta for FormatArgs {
         let mut errors = darling::Error::accumulator();
         let handle_kv = |result: &mut FormatArgs, key: &Path, value: &TokenStream| {
             seen_keyword_args.set(true);
-            let key = match key.get_ident() {
-                Some(ident) => ident,
-                None => {
-                    return Err(darling::Error::custom("Keyword arg name must be an identifier").with_span(&key));
-                }
+            let Some(key) = key.get_ident() else {
+                return Err(darling::Error::custom("Keyword arg name must be an identifier").with_span(&key));
             };
             if result.keyword_args.contains_key(key) {
                 Err(darling::Error::custom(format!("Key `{key}` is specified more than once")).with_span(&key.span()))
@@ -139,8 +136,7 @@ impl FormatString {
                         let format_start_index = current_pos();
                         if remaining[closing_index..].starts_with("}}") {
                             return Err(FormatStringParseError(format!(
-                                "Argument spec cannot include an escaped `}}` (start_byte = {})",
-                                format_start_index,
+                                "Argument spec cannot include an escaped `}}` (start_byte = {format_start_index})",
                             )));
                         }
                         let format_text = &remaining[1..closing_index];
@@ -174,7 +170,7 @@ impl FormatString {
                     if let Some(FormatStringPart::Literal(part)) = parts.last_mut() {
                         part.push(other);
                     } else {
-                        parts.push(FormatStringPart::Literal(String::from(other)))
+                        parts.push(FormatStringPart::Literal(String::from(other)));
                     }
                 }
                 None => {
@@ -208,12 +204,12 @@ impl darling::FromMeta for FormatString {
 pub struct FormatStringParseError(String);
 impl Error for FormatStringParseError {}
 impl Display for FormatStringParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "Failed to parse format string: {}", self.0)
     }
 }
 impl Display for FormatString {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.write_str(self.text())
     }
 }
@@ -226,7 +222,7 @@ impl FromStr for FormatString {
 }
 impl ToTokens for FormatString {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.lit.to_tokens(tokens)
+        self.lit.to_tokens(tokens);
     }
 }
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -254,7 +250,7 @@ impl FormatStringPart {
     }
 }
 impl Display for FormatStringPart {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             FormatStringPart::Literal(text) => f.write_str(text),
             FormatStringPart::EscapedOpenBrace => f.write_str("{{"),
@@ -276,12 +272,12 @@ impl FormatArgRef {
     fn validate(&self) {
         validate::forbid_chars(&format_args!("argument in {self:?}"), &self.argument, &['{', '}', ':']);
         if let Some(ref fmt_spec) = self.fmt_spec {
-            validate::forbid_chars(&format_args!("fmt spec in {self:?}"), fmt_spec, validate::BRACE_CHARS)
+            validate::forbid_chars(&format_args!("fmt spec in {self:?}"), fmt_spec, validate::BRACE_CHARS);
         }
     }
 }
 impl Display for FormatArgRef {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{{{arg}", arg = self.argument)?;
         if let Some(ref spec) = self.fmt_spec {
             write!(f, ":{spec}")?;
@@ -291,13 +287,13 @@ impl Display for FormatArgRef {
 }
 
 mod validate {
-    use std::fmt::Debug;
+    use core::fmt::Debug;
 
     pub const BRACE_CHARS: &[char] = &['{', '}'];
     #[track_caller]
     pub fn forbid_chars(this: &dyn Debug, s: &str, forbidden: &[char]) {
         for c in s.chars() {
-            assert!(!forbidden.contains(&c), "{this:?} contains invalid character `{c}`")
+            assert!(!forbidden.contains(&c), "{this:?} contains invalid character `{c}`");
         }
     }
 }

@@ -1,5 +1,5 @@
+use core::fmt::{Display, Formatter};
 use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
 
 use darling::ast::NestedMeta;
 use darling::{FromDeriveInput, FromMeta, FromVariant};
@@ -29,6 +29,7 @@ struct DisplayVariant {
     fields: darling::ast::Fields<syn::Field>,
 }
 
+#[expect(clippy::needless_pass_by_value, reason = "signature required by darling")]
 fn parse_display_attrs(attrs: Vec<Attribute>) -> darling::Result<Option<DisplayAttr>> {
     let mut res = None;
     for attr in &attrs {
@@ -85,7 +86,7 @@ fn rewrite_fmt_str(fmt: &FormatString, used_fields: &mut HashSet<FieldSpec>) -> 
                 new_arg.argument = prefix_field(&orig_arg);
                 FormatStringPart::ArgRef(new_arg)
             }
-        })
+        });
     }
     Ok(FormatString::from_parts(&new_parts, fmt.span()))
 }
@@ -96,7 +97,7 @@ enum FieldSpec {
     Unnamed(usize),
 }
 impl Display for FieldSpec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             FieldSpec::Named(name) => f.write_str(name),
             FieldSpec::Unnamed(index) => write!(f, "{index}"),
@@ -175,7 +176,7 @@ pub fn derive_display(input: &syn::DeriveInput) -> darling::Result<TokenStream> 
                     Self::#ident #destructure => {
                         #write
                     }
-                })
+                });
             }
             quote! {
                 match *self {

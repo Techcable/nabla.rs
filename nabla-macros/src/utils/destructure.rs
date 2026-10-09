@@ -11,7 +11,7 @@ use quote::{ToTokens, TokenStreamExt, quote};
 
 impl ToTokens for RefStyle {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append_all(self.to_token_stream())
+        tokens.append_all(self.to_token_stream());
     }
     fn to_token_stream(&self) -> TokenStream {
         match self {
@@ -111,26 +111,21 @@ impl<'a, V: DestructureTarget> DestructuredType<'a, V> {
 }
 impl<V: DestructureTarget> ToTokens for DestructuredType<'_, V> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append_all(self.to_token_stream())
+        tokens.append_all(self.to_token_stream());
     }
 
     fn to_token_stream(&self) -> TokenStream {
         let ref_style = self.ref_style;
         match self.variant.style() {
             Style::Tuple => {
-                let fields = self
-                    .variant
-                    .fields()
-                    .enumerate()
-                    .map(|(index, field)| match field.name() {
-                        Some(name) => {
-                            panic!("A tuple should have no named fields (got {name})")
-                        }
-                        None => {
-                            let name = (self.tuple_namer)(index);
-                            Ident::new(&name, Span::call_site())
-                        }
-                    });
+                let fields = self.variant.fields().enumerate().map(|(index, field)| {
+                    if let Some(name) = field.name() {
+                        panic!("A tuple should have no named fields (got {name})")
+                    } else {
+                        let name = (self.tuple_namer)(index);
+                        Ident::new(&name, Span::call_site())
+                    }
+                });
                 quote! {(
                     #(#ref_style #fields,)*
                 )}

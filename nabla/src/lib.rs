@@ -67,7 +67,7 @@
 /// # Not Yet Implemented
 /// - Use of `.0` or `.field` shorthand to reference fields in format args
 /// - A `#[display(transparent)]` attribute similar to `#[error(transparent)]` in thisserror.
-///   This can be easily emulated by `#[display("{0}")]
+///   This can be easily emulated by `#[display("{0}")]`
 ///
 /// [`thiserror::Error`]: https://docs.rs/thiserror/2/thiserror/derive.Error.html
 pub use nabla_macros::Display;
