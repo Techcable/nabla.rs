@@ -5,6 +5,8 @@ use darling::ast::NestedMeta;
 use darling::{FromDeriveInput, FromMeta, FromVariant};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote};
+use syn::ext::IdentExt;
+use syn::parse::Parser;
 use syn::spanned::Spanned;
 use syn::{Attribute, Member};
 
@@ -66,7 +68,8 @@ impl FromMeta for DisplayAttr {
 
 const FIELD_PREFIX: &str = "__nabla_field_";
 fn prefix_field(x: impl Display) -> String {
-    format!("{FIELD_PREFIX}{x}")
+    let name = x.to_string();
+    format!("{FIELD_PREFIX}{}", name.strip_prefix("r#").unwrap_or(&name))
 }
 
 fn rewrite_fmt_str(fmt: &FormatString, used_fields: &mut HashSet<FieldSpec>) -> darling::Result<FormatString> {
@@ -79,7 +82,11 @@ fn rewrite_fmt_str(fmt: &FormatString, used_fields: &mut HashSet<FieldSpec>) -> 
             FormatStringPart::ArgRef(orig_ref) => {
                 let mut new_arg = orig_ref.clone();
                 let orig_arg = &*orig_ref.argument;
-                let orig_arg = FieldSpec::from(&syn::parse_str::<Member>(orig_arg).map_err(|cause| {
+                let member = Ident::parse_any
+                    .parse_str(orig_arg)
+                    .map(Member::Named)
+                    .or_else(|_| syn::parse_str::<Member>(orig_arg));
+                let orig_arg = FieldSpec::from(&member.map_err(|cause| {
                     darling::Error::custom(format!("Failed to parse fmt argument: {cause}")).with_span(fmt.lit())
                 })?);
                 used_fields.insert(orig_arg.clone());
@@ -107,7 +114,7 @@ impl Display for FieldSpec {
 impl<'a> From<&'a syn::Member> for FieldSpec {
     fn from(value: &'a Member) -> Self {
         match value {
-            Member::Named(name) => FieldSpec::Named(name.to_string()),
+            Member::Named(name) => FieldSpec::Named(name.unraw().to_string()),
             Member::Unnamed(index) => FieldSpec::Unnamed(index.index as usize),
         }
     }
@@ -123,7 +130,7 @@ fn expand_write(mut variant: WriteExpandInfo) -> darling::Result<TokenStream> {
         .iter()
         .enumerate()
         .map(|(index, field)| match field.ident {
-            Some(ref name) => FieldSpec::Named(name.to_string()),
+            Some(ref name) => FieldSpec::Named(name.unraw().to_string()),
             None => FieldSpec::Unnamed(index),
         })
         .collect::<Vec<_>>();

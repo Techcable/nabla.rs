@@ -10,6 +10,10 @@ A title is required for publishing a github release, so all versions should have
 
 ## Unreleased
 
+### Fixed
+
+- Prevent `Display` from panicking on raw field identifiers such as `r#type` (mmxtssrp).
+
 ## 0.1.0-beta.1
 Support `#[derive(From)]` for newtype structs.
 
