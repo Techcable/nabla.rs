@@ -76,6 +76,7 @@ fn rewrite_fmt_str(
     args: &FormatArgs,
     field_args: &HashMap<FieldSpec, Ident>,
     used_fields: &mut HashSet<FieldSpec>,
+    count_fields: &mut HashSet<FieldSpec>,
 ) -> darling::Result<FormatString> {
     let fmt = &args.format_string;
     let mut new_parts = Vec::new();
@@ -86,31 +87,92 @@ fn rewrite_fmt_str(
             }
             FormatStringPart::ArgRef(orig_ref) => {
                 let mut new_arg = orig_ref.clone();
-                let orig_arg = &*orig_ref.argument;
-                if orig_arg.is_empty()
-                    || args.keyword_args.keys().any(|key| key == orig_arg)
-                    || (!args.positional_args.is_empty() && orig_arg.parse::<usize>().is_ok())
-                {
-                    new_parts.push(part.clone());
-                    continue;
+                new_arg.argument = rewrite_arg(&orig_ref.argument, args, field_args, used_fields)?;
+                if let Some(spec) = &orig_ref.fmt_spec {
+                    new_arg.fmt_spec = Some(rewrite_fmt_spec(spec, |name| {
+                        rewrite_arg(name, args, field_args, count_fields)
+                    })?);
                 }
-                let member = Ident::parse_any
-                    .parse_str(orig_arg)
-                    .map(Member::Named)
-                    .or_else(|_| syn::parse_str::<Member>(orig_arg));
-                let orig_arg = FieldSpec::from(&member.map_err(|cause| {
-                    darling::Error::custom(format!("Failed to parse fmt argument: {cause}")).with_span(fmt.lit())
-                })?);
-                new_arg.argument = field_args
-                    .get(&orig_arg)
-                    .ok_or_else(|| darling::Error::custom(format!("Unknown field `{orig_arg}`")).with_span(fmt.lit()))?
-                    .to_string();
-                used_fields.insert(orig_arg);
                 FormatStringPart::ArgRef(new_arg)
             }
         });
     }
     Ok(FormatString::from_parts(&new_parts, fmt.span()))
+}
+
+fn rewrite_arg(
+    name: &str,
+    args: &FormatArgs,
+    field_args: &HashMap<FieldSpec, Ident>,
+    used_fields: &mut HashSet<FieldSpec>,
+) -> darling::Result<String> {
+    if name.is_empty()
+        || args.keyword_args.keys().any(|key| key == name)
+        || (!args.positional_args.is_empty() && name.parse::<usize>().is_ok())
+    {
+        return Ok(name.into());
+    }
+    let member = Ident::parse_any
+        .parse_str(name)
+        .map(Member::Named)
+        .or_else(|_| syn::parse_str::<Member>(name));
+    let field = FieldSpec::from(&member.map_err(|cause| {
+        darling::Error::custom(format!("Failed to parse fmt argument: {cause}")).with_span(args.format_string.lit())
+    })?);
+    let rewritten = field_args
+        .get(&field)
+        .ok_or_else(|| darling::Error::custom(format!("Unknown field `{field}`")).with_span(args.format_string.lit()))?
+        .to_string();
+    used_fields.insert(field);
+    Ok(rewritten)
+}
+
+/// Rewrite width and precision parameters, preserving fill, flags, and format type.
+fn rewrite_fmt_spec(spec: &str, mut rewrite: impl FnMut(&str) -> darling::Result<String>) -> darling::Result<String> {
+    fn count(
+        rest: &mut &str,
+        output: &mut String,
+        rewrite: &mut impl FnMut(&str) -> darling::Result<String>,
+    ) -> darling::Result<()> {
+        if let Some((name, suffix)) = rest.split_once('$')
+            && (Ident::parse_any.parse_str(name).is_ok() || name.parse::<usize>().is_ok())
+        {
+            output.push_str(&rewrite(name)?);
+            output.push('$');
+            *rest = suffix;
+        } else {
+            let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+            output.push_str(&rest[..digits]);
+            *rest = &rest[digits..];
+        }
+        Ok(())
+    }
+
+    let mut rest = spec;
+    let mut chars = rest.char_indices();
+    let first = chars.next();
+    let second = chars.next();
+    if let Some((index, ch @ ('<' | '>' | '^'))) = second {
+        rest = &rest[index + ch.len_utf8()..];
+    } else if let Some((_, ch @ ('<' | '>' | '^'))) = first {
+        rest = &rest[ch.len_utf8()..];
+    }
+    for flag in ["+", "-", "#"] {
+        rest = rest.strip_prefix(flag).unwrap_or(rest);
+    }
+    // `0$` is argument zero, whereas `0width$` enables zero padding.
+    if !rest.starts_with("0$") {
+        rest = rest.strip_prefix('0').unwrap_or(rest);
+    }
+    let mut output = spec[..spec.len() - rest.len()].to_owned();
+    count(&mut rest, &mut output, &mut rewrite)?;
+    if let Some(precision) = rest.strip_prefix('.') {
+        output.push('.');
+        rest = precision;
+        count(&mut rest, &mut output, &mut rewrite)?;
+    }
+    output.push_str(rest);
+    Ok(output)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -150,6 +212,7 @@ fn expand_write(mut variant: WriteExpandInfo) -> darling::Result<TokenStream> {
         })
         .collect::<Vec<_>>();
     let mut used_fields = HashSet::new();
+    let mut count_fields = HashSet::new();
     let field_args = field_specs
         .iter()
         .enumerate()
@@ -161,17 +224,20 @@ fn expand_write(mut variant: WriteExpandInfo) -> darling::Result<TokenStream> {
             (field.clone(), Ident::new(&name, Span::call_site()))
         })
         .collect::<HashMap<_, _>>();
-    variant.attr.fmt.format_string = rewrite_fmt_str(&variant.attr.fmt, &field_args, &mut used_fields)?;
+    variant.attr.fmt.format_string =
+        rewrite_fmt_str(&variant.attr.fmt, &field_args, &mut used_fields, &mut count_fields)?;
     for field in &field_specs {
-        if !used_fields.contains(field) {
+        if !used_fields.contains(field) && !count_fields.contains(field) {
             continue;
         }
         let prefixed_name = Ident::new(&prefix_field(field), Span::call_site());
-        let existing = variant
-            .attr
-            .fmt
-            .keyword_args
-            .insert(field_args[field].clone(), prefixed_name.to_token_stream());
+        // Formatting counts require usize values, while destructured fields are borrowed.
+        let value = if count_fields.contains(field) {
+            quote!(*#prefixed_name)
+        } else {
+            prefixed_name.to_token_stream()
+        };
+        let existing = variant.attr.fmt.keyword_args.insert(field_args[field].clone(), value);
         assert!(existing.is_none());
     }
     let fmt = &variant.attr.fmt;

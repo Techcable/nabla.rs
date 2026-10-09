@@ -79,3 +79,89 @@ fn explicit_format_arguments() {
     assert_eq!(Constants::Named.to_string(), "42");
     assert_eq!(Constants::Positional.to_string(), "42");
 }
+#[test]
+fn dynamic_width_and_precision() {
+    #[derive(nabla::Display)]
+    #[display("{value:$>width$}|{value:+#0width$x}|{value:10.precision$}|{value:.precision$}")]
+    struct Flags {
+        value: u32,
+        width: usize,
+        precision: usize,
+    }
+
+    #[derive(nabla::Display)]
+    #[display("{value:width$.precision$}|{value:🦀>width$.precision$}|{width:width$}")]
+    struct Named {
+        value: f64,
+        width: usize,
+        precision: usize,
+    }
+
+    #[derive(nabla::Display)]
+    #[display("{0:1$.2$}")]
+    struct Tuple(f64, usize, usize);
+
+    #[derive(nabla::Display)]
+    enum Raw {
+        #[display("{value:0type$x}")]
+        Value {
+            value: u32,
+            r#type: usize,
+        },
+    }
+
+    assert_eq!(
+        Named {
+            value: 1.25,
+            width: 6,
+            precision: 1
+        }
+        .to_string(),
+        "   1.2|🦀🦀🦀1.2|     6"
+    );
+    assert_eq!(Tuple(1.25, 6, 1).to_string(), "   1.2");
+    assert_eq!(Raw::Value { value: 42, r#type: 4 }.to_string(), "002a");
+    let value = 42;
+    let width = 8;
+    let precision = 3;
+    assert_eq!(
+        Flags {
+            value,
+            width,
+            precision
+        }
+        .to_string(),
+        format!("{value:$>width$}|{value:+#0width$x}|{value:10.precision$}|{value:.precision$}")
+    );
+}
+
+#[test]
+fn dynamic_counts_with_explicit_arguments() {
+    #[derive(nabla::Display)]
+    #[display("{:width$.precision$}", self.value, width = 6)]
+    struct Override {
+        value: f64,
+        width: usize,
+        precision: usize,
+    }
+
+    #[derive(nabla::Display)]
+    #[display("{1:0$.2$}|{1:🦀>0$.2$}", 6, 1.25, 1)]
+    struct Positional;
+
+    #[derive(nabla::Display)]
+    #[display("{:.*} {}", 1, 1.25, 42)]
+    struct ImplicitPrecision;
+
+    assert_eq!(
+        Override {
+            value: 1.25,
+            width: 99,
+            precision: 1
+        }
+        .to_string(),
+        "   1.2"
+    );
+    assert_eq!(Positional.to_string(), "   1.2|🦀🦀🦀1.2");
+    assert_eq!(ImplicitPrecision.to_string(), "1.2 42");
+}

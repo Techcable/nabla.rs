@@ -18,6 +18,8 @@
 /// Named arguments override fields with the same name. When positional arguments
 /// are supplied, numeric placeholders refer to those arguments; otherwise they
 /// refer to tuple fields.
+/// Width and precision can also refer to fields, such as `{value:width$.precision$}`;
+/// these count fields must have type `usize`.
 ///
 /// The `#[nabla(display(...))` attribute means the same thing as `#[display(...)]`.
 /// This may be useful to avoid conflicts or for clarity.
