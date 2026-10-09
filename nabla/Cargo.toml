@@ -18,3 +18,6 @@ nabla-macros.workspace = true
 alloc = []
 # Enable features that require the standard library
 std = ["alloc"]
+
+[lints]
+workspace = true
