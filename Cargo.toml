@@ -13,6 +13,8 @@ edition = "2024"
 # Rust 1.85 - 2024 edition
 # Rust 1.88 - let chains, darling@0.24.0
 # Rust 1.95 - if let guards on match arms
+#
+# if changed, keep in sync with CI
 rust-version = "1.95"
 repository = "https://github.com/Techcable/nabla.rs"
 license = "MIT OR Apache-2.0"
