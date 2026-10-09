@@ -4,7 +4,7 @@ import sys
 
 from invoke import Collection, task
 
-HAS_COLORS: bool = (sys.stderr.isatty() or os.getenv("FORCE_COLOR")) and not os.getenv("NO_COLOR")
+HAS_COLORS: bool = (sys.stderr.isatty() or os.getenv("CLICOLOR_FORCE")) and not os.getenv("NO_COLOR")
 
 
 def apply_colors(msg: object, /, *, code: str) -> str:
@@ -14,14 +14,10 @@ def apply_colors(msg: object, /, *, code: str) -> str:
         return str(msg)
 
 
-def bold(msg: object, /) -> str:
-    return apply_colors(msg, code="1")
-
-
-def log_info(msg: object, /):
+def log_info(msg: object):
     print(
         apply_colors("INFO:", code="1;32"),
-        bold(msg),
+        apply_colors(msg, code="1"),
     )
 
 
@@ -37,26 +33,16 @@ def test(ctx):
 @task
 def check(ctx, format=True):
     clippy(ctx)
-    # need to exclude gitpatcher-bin due to "output filename collision"
-    # The gitpatcher binary conflicts with the gitpatcher library.
-    # See rust-lang/cargo#6313 for details
-    ctx.run("cargo +nightly doc --document-private-items --no-deps --workspace --exclude gitpatcher-bin --all-features")
-    # separately check gitpatcher-bin docs
-    ctx.run("cargo +nightly doc --document-private-items --no-deps -p gitpatcher-bin --all-features")
+    ctx.run("cargo +nightly doc --document-private-items --no-deps --workspace --all-features")
     ctx.run("cargo shear")
     ctx.run("cargo deny check")
+    cargo_reedme(ctx, check=True)
     # by default, check formatting as well
     if format:
         run_format(ctx, check=True)
 
 
-REEDME_SYNC_PKGS = ["gitpatcher", "test-paper-patch"]
-"""
-Packages to sync with cargo-reedme.
-
-We only want to sync the readmes of a subset of packages.
-Some crates don't have dedicated README and trying to sync them will affect the root readme.
-"""
+REEDME_SYNC_PKGS = ["nabla"]
 
 
 @task
@@ -82,8 +68,6 @@ def run_format(ctx, check=False):
     maybe_fix = " --fix" if not check else ""
     ctx.run("cargo +nightly fmt --all" + maybe_check)
     ctx.run("tombi format" + maybe_check)
-    # cargo-sort is currently disabled as it causes excessive rebase conflicts
-    # ctx.run("cargo sort --grouped --no-format --workspace" + maybe_check)a
 
     # need python format for invoke.py
     ctx.run("ruff format" + maybe_check)
@@ -91,7 +75,7 @@ def run_format(ctx, check=False):
     check_spelling(ctx, fix=False)
 
 
-TYPOS_VER = "1.45"  # pinned to avoid update breakage
+TYPOS_VER = "1.51.1"  # pinned to avoid update breakage
 
 
 @task(name="typos")
