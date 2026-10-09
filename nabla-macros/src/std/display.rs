@@ -6,8 +6,9 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::ext::IdentExt;
 use syn::parse::Parser;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Attribute, Member};
+use syn::{Attribute, Member, Meta, Token};
 
 use crate::utils::destructure::{DestructuredType, RefStyle};
 use crate::utils::fmt_args::{FormatArgs, FormatString, FormatStringPart};
@@ -34,20 +35,29 @@ struct DisplayVariant {
 fn parse_display_attrs(attrs: Vec<Attribute>) -> darling::Result<Option<DisplayAttr>> {
     let mut res = None;
     for attr in &attrs {
-        if attr.path().is_ident("display") {
+        let metas = if attr.path().is_ident("display") {
+            vec![attr.meta.clone()]
+        } else if attr.path().is_ident("nabla") {
+            attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?
+                .into_iter()
+                .collect()
+        } else {
+            continue;
+        };
+        for meta in &metas {
+            if !meta.path().is_ident("display") {
+                return Err(
+                    darling::Error::unknown_field(&meta.path().to_token_stream().to_string()).with_span(meta.path()),
+                );
+            }
             if res.is_some() {
                 return Err(
                     darling::Error::custom("The #[display(..)] attribute should not be duplicated")
-                        .with_span(attr.path()),
+                        .with_span(meta.path()),
                 );
             }
-            let attr = <DisplayAttr as FromMeta>::from_meta(&attr.meta)?;
+            let attr = <DisplayAttr as FromMeta>::from_meta(meta)?;
             res = Some(attr);
-        } else if attr.path().is_ident("nabla") {
-            return Err(
-                darling::Error::custom("The #[nabla(...)] attribute is not currently implemented")
-                    .with_span(attr.path()),
-            );
         }
     }
     Ok(res)
@@ -303,6 +313,38 @@ pub fn derive_display(input: &syn::DeriveInput) -> darling::Result<TokenStream> 
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::derive_display;
+
+    #[test]
+    fn duplicate_display_attributes() {
+        for attrs in [
+            quote::quote!(#[display("a")] #[nabla(display("b"))]),
+            quote::quote!(#[nabla(display("a"))] #[display("b")]),
+            quote::quote!(#[nabla(display("a"), display("b"))]),
+            quote::quote!(#[nabla(display("a"))] #[nabla(display("b"))]),
+        ] {
+            let input = syn::parse_quote!(#attrs struct Example;);
+            let error = derive_display(&input).unwrap_err();
+            assert!(error.to_string().contains("should not be duplicated"), "{error}");
+        }
+    }
+
+    #[test]
+    fn invalid_namespaced_attributes() {
+        for attrs in [
+            quote::quote!(#[nabla(unknown("a"))]),
+            quote::quote!(#[nabla(display)]),
+            quote::quote!(#[nabla(display(42))]),
+            quote::quote!(#[nabla(display("{x}", x = 1, x = 2))]),
+        ] {
+            let input = syn::parse_quote!(#attrs struct Example;);
+            assert!(derive_display(&input).is_err());
+        }
+    }
 }
 
 #[cfg(false)]

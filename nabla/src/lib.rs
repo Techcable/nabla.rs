@@ -21,7 +21,7 @@
 /// Width and precision can also refer to fields, such as `{value:width$.precision$}`;
 /// these count fields must have type `usize`.
 ///
-/// The `#[nabla(display(...))` attribute means the same thing as `#[display(...)]`.
+/// The `#[nabla(display(...))]` attribute means the same thing as `#[display(...)]`.
 /// This may be useful to avoid conflicts or for clarity.
 ///
 /// # Examples

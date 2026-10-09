@@ -165,3 +165,41 @@ fn dynamic_counts_with_explicit_arguments() {
     assert_eq!(Positional.to_string(), "   1.2|🦀🦀🦀1.2");
     assert_eq!(ImplicitPrecision.to_string(), "1.2 42");
 }
+#[test]
+fn namespaced_display_attributes() {
+    #[derive(nabla::Display)]
+    #[nabla(display("{value:width$}", width = 4))]
+    struct Named {
+        value: u32,
+    }
+
+    #[derive(nabla::Display)]
+    #[nabla(display("{}", self.0 + 1))]
+    struct Tuple(u32);
+
+    #[derive(nabla::Display)]
+    #[nabla(display("unit"))]
+    struct Unit;
+
+    #[derive(nabla::Display)]
+    enum Enum {
+        #[nabla(display("{type}"))]
+        Named {
+            r#type: u32,
+        },
+        #[nabla(display("{0}"))]
+        Tuple(u32),
+        #[nabla(display("unit"))]
+        Unit,
+        #[display("direct")]
+        Direct,
+    }
+
+    assert_eq!(Named { value: 42 }.to_string(), "  42");
+    assert_eq!(Tuple(41).to_string(), "42");
+    assert_eq!(Unit.to_string(), "unit");
+    assert_eq!(Enum::Named { r#type: 42 }.to_string(), "42");
+    assert_eq!(Enum::Tuple(42).to_string(), "42");
+    assert_eq!(Enum::Unit.to_string(), "unit");
+    assert_eq!(Enum::Direct.to_string(), "direct");
+}

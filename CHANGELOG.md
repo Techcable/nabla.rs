@@ -17,6 +17,7 @@ A title is required for publishing a github release, so all versions should have
 - Honor explicit named and positional `Display` format arguments, including Rust expressions (nxwsuvsu).
 - Resolve `Display` width and precision references to struct and enum fields (yzmwpuyu).
 - Resolve derived `From` implementations to `core::convert::From` when `From` is shadowed or the prelude is disabled (rkmmztxp).
+- Support the documented `#[nabla(display(...))]` alias on structs and enum variants (pvsymkqt).
 
 ## 0.1.0-beta.1
 Support `#[derive(From)]` for newtype structs.
