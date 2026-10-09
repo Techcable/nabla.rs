@@ -1,15 +1,15 @@
 //! Parses format arguments.
 
-use core::cell::Cell;
 use core::error::Error;
 use core::fmt::{Debug, Display, Formatter, Write};
 use core::str::FromStr;
 
-use darling::ast::NestedMeta;
 use indexmap::IndexMap;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, TokenStreamExt};
-use syn::{Lit, LitStr, Meta, Path};
+use syn::ext::IdentExt;
+use syn::parse::{Parse, ParseStream};
+use syn::{Expr, Lit, LitStr, Token};
 
 /// A format specification that can be passed to [`format_args!`] and friends.
 #[derive(Debug, Clone)]
@@ -18,52 +18,43 @@ pub struct FormatArgs {
     pub positional_args: Vec<TokenStream>,
     pub keyword_args: IndexMap<Ident, TokenStream>,
 }
-impl darling::FromMeta for FormatArgs {
-    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
-        let mut items = items.iter();
-        let first = items.next().ok_or_else(|| darling::Error::too_few_items(1))?;
-        let format_string = FormatString::from_nested_meta(first)?;
+impl Parse for FormatArgs {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let literal: LitStr = input.parse()?;
+        let format_string = FormatString::from_str_spanned(&literal.value(), literal.span())
+            .map_err(|error| syn::Error::new(literal.span(), error))?;
         let mut result = FormatArgs {
             format_string,
             positional_args: Vec::new(),
             keyword_args: IndexMap::new(),
         };
-        let seen_keyword_args = Cell::new(false);
-        let mut errors = darling::Error::accumulator();
-        let handle_kv = |result: &mut FormatArgs, key: &Path, value: &TokenStream| {
-            seen_keyword_args.set(true);
-            let Some(key) = key.get_ident() else {
-                return Err(darling::Error::custom("Keyword arg name must be an identifier").with_span(&key));
-            };
-            if result.keyword_args.contains_key(key) {
-                Err(darling::Error::custom(format!("Key `{key}` is specified more than once")).with_span(&key.span()))
-            } else {
-                result.keyword_args.insert(key.clone(), value.clone());
-                Ok(())
+        while !input.is_empty() {
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
             }
-        };
-        for item in items {
-            match item {
-                NestedMeta::Meta(Meta::NameValue(kv)) => {
-                    errors.handle(handle_kv(&mut result, &kv.path, &kv.value.to_token_stream()));
+            if input.peek(Ident::peek_any) && input.peek2(Token![=]) {
+                let key = input.call(Ident::parse_any)?.unraw();
+                input.parse::<Token![=]>()?;
+                let value: Expr = input.parse()?;
+                if result
+                    .keyword_args
+                    .insert(key.clone(), value.to_token_stream())
+                    .is_some()
+                {
+                    return Err(syn::Error::new(
+                        key.span(),
+                        format!("Key `{key}` is specified more than once"),
+                    ));
                 }
-                meta @ (NestedMeta::Meta(Meta::Path(_) | Meta::List(_)) | NestedMeta::Lit(_)) => {
-                    let positional_arg = meta.to_token_stream();
-                    if seen_keyword_args.get() {
-                        errors.push(
-                            darling::Error::custom("Cannot have positional arguments after keyword arguments")
-                                .with_span(&positional_arg),
-                        );
-                    } else {
-                        result.positional_args.push(positional_arg);
-                    }
+            } else {
+                if !result.keyword_args.is_empty() {
+                    return Err(input.error("Cannot have positional arguments after keyword arguments"));
                 }
-                NestedMeta::NameValueInvalidExpr(value) => {
-                    errors.handle(handle_kv(&mut result, &value.path, &value.value));
-                }
+                result.positional_args.push(input.parse::<Expr>()?.to_token_stream());
             }
         }
-        errors.finish_with(result)
+        Ok(result)
     }
 }
 impl ToTokens for FormatArgs {
@@ -294,7 +285,18 @@ mod validate {
 
 #[cfg(test)]
 mod test {
-    use super::FormatString;
+    use super::{FormatArgs, FormatString};
+
+    #[test]
+    fn invalid_explicit_arguments() {
+        for (input, expected) in [
+            (r#""{x}", x = 1, x = 2"#, "specified more than once"),
+            (r#""{x}", x = 1, 2"#, "positional arguments after keyword"),
+        ] {
+            let error = syn::parse_str::<FormatArgs>(input).unwrap_err();
+            assert!(error.to_string().contains(expected), "{error}");
+        }
+    }
 
     #[test]
     fn braces_after_arguments() {

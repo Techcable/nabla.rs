@@ -1,7 +1,6 @@
 use core::fmt::{Display, Formatter};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use darling::ast::NestedMeta;
 use darling::{FromDeriveInput, FromMeta, FromVariant};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote};
@@ -59,9 +58,10 @@ struct DisplayAttr {
     fmt: FormatArgs,
 }
 impl FromMeta for DisplayAttr {
-    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
-        Ok(DisplayAttr {
-            fmt: FormatArgs::from_list(items)?,
+    fn from_meta(meta: &syn::Meta) -> darling::Result<Self> {
+        let list = meta.require_list()?;
+        Ok(Self {
+            fmt: syn::parse2(list.tokens.clone())?,
         })
     }
 }
@@ -72,7 +72,12 @@ fn prefix_field(x: impl Display) -> String {
     format!("{FIELD_PREFIX}{}", name.strip_prefix("r#").unwrap_or(&name))
 }
 
-fn rewrite_fmt_str(fmt: &FormatString, used_fields: &mut HashSet<FieldSpec>) -> darling::Result<FormatString> {
+fn rewrite_fmt_str(
+    args: &FormatArgs,
+    field_args: &HashMap<FieldSpec, Ident>,
+    used_fields: &mut HashSet<FieldSpec>,
+) -> darling::Result<FormatString> {
+    let fmt = &args.format_string;
     let mut new_parts = Vec::new();
     for part in fmt.parts() {
         new_parts.push(match part {
@@ -82,6 +87,13 @@ fn rewrite_fmt_str(fmt: &FormatString, used_fields: &mut HashSet<FieldSpec>) -> 
             FormatStringPart::ArgRef(orig_ref) => {
                 let mut new_arg = orig_ref.clone();
                 let orig_arg = &*orig_ref.argument;
+                if orig_arg.is_empty()
+                    || args.keyword_args.keys().any(|key| key == orig_arg)
+                    || (!args.positional_args.is_empty() && orig_arg.parse::<usize>().is_ok())
+                {
+                    new_parts.push(part.clone());
+                    continue;
+                }
                 let member = Ident::parse_any
                     .parse_str(orig_arg)
                     .map(Member::Named)
@@ -89,8 +101,11 @@ fn rewrite_fmt_str(fmt: &FormatString, used_fields: &mut HashSet<FieldSpec>) -> 
                 let orig_arg = FieldSpec::from(&member.map_err(|cause| {
                     darling::Error::custom(format!("Failed to parse fmt argument: {cause}")).with_span(fmt.lit())
                 })?);
-                used_fields.insert(orig_arg.clone());
-                new_arg.argument = prefix_field(&orig_arg);
+                new_arg.argument = field_args
+                    .get(&orig_arg)
+                    .ok_or_else(|| darling::Error::custom(format!("Unknown field `{orig_arg}`")).with_span(fmt.lit()))?
+                    .to_string();
+                used_fields.insert(orig_arg);
                 FormatStringPart::ArgRef(new_arg)
             }
         });
@@ -135,7 +150,18 @@ fn expand_write(mut variant: WriteExpandInfo) -> darling::Result<TokenStream> {
         })
         .collect::<Vec<_>>();
     let mut used_fields = HashSet::new();
-    variant.attr.fmt.format_string = rewrite_fmt_str(&variant.attr.fmt.format_string, &mut used_fields)?;
+    let field_args = field_specs
+        .iter()
+        .enumerate()
+        .map(|(index, field)| {
+            let mut name = format!("__nabla_arg_{index}");
+            while variant.attr.fmt.keyword_args.keys().any(|key| key == &name) {
+                name.push('_');
+            }
+            (field.clone(), Ident::new(&name, Span::call_site()))
+        })
+        .collect::<HashMap<_, _>>();
+    variant.attr.fmt.format_string = rewrite_fmt_str(&variant.attr.fmt, &field_args, &mut used_fields)?;
     for field in &field_specs {
         if !used_fields.contains(field) {
             continue;
@@ -145,7 +171,7 @@ fn expand_write(mut variant: WriteExpandInfo) -> darling::Result<TokenStream> {
             .attr
             .fmt
             .keyword_args
-            .insert(prefixed_name.clone(), prefixed_name.to_token_stream());
+            .insert(field_args[field].clone(), prefixed_name.to_token_stream());
         assert!(existing.is_none());
     }
     let fmt = &variant.attr.fmt;

@@ -14,6 +14,7 @@ A title is required for publishing a github release, so all versions should have
 
 - Prevent `Display` from panicking on raw field identifiers such as `r#type` (mmxtssrp).
 - Accept escaped closing braces after `Display` placeholders, including `"{{{value}}}"` (kkoqwmoy).
+- Honor explicit named and positional `Display` format arguments, including Rust expressions (nxwsuvsu).
 
 ## 0.1.0-beta.1
 Support `#[derive(From)]` for newtype structs.

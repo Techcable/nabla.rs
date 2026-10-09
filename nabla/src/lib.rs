@@ -14,6 +14,10 @@
 ///
 /// Each struct or enum variant can have a `#[display("fmtstr")]` attribute
 /// where `"fmtstr"` has access to the fields of the struct/variant.
+/// Explicit format arguments accept Rust expressions, including `self.field`.
+/// Named arguments override fields with the same name. When positional arguments
+/// are supplied, numeric placeholders refer to those arguments; otherwise they
+/// refer to tuple fields.
 ///
 /// The `#[nabla(display(...))` attribute means the same thing as `#[display(...)]`.
 /// This may be useful to avoid conflicts or for clarity.
