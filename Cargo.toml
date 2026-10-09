@@ -9,9 +9,9 @@ members = [
 version = "0.1.0-beta.1"
 authors = ["Techcable"]
 edition = "2024"
-# Rust 1.88 - let chains, darling@0.24.0
-# Rust 1.85 - 2024 edition
 # Rust 1.71 - syn@3.0.0
+# Rust 1.85 - 2024 edition
+# Rust 1.88 - let chains, darling@0.24.0
 rust-version = "1.88"
 repository = "https://github.com/Techcable/nabla.rs"
 license = "MIT OR Apache-2.0"
