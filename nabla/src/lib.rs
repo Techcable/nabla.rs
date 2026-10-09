@@ -71,7 +71,6 @@
 ///
 /// [`thiserror::Error`]: https://docs.rs/thiserror/2/thiserror/derive.Error.html
 pub use nabla_macros::Display;
-
 /// Derive [`core::convert::From`] for newtype structs.
 ///
 /// # Examples

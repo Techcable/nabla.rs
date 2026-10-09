@@ -13,7 +13,6 @@ wrap_derive_macros! {
     fn derive_display() => std::display::derive_display;
 }
 
-
 wrap_derive_macros! {
     #[proc_macro_derive(From)]
     fn derive_from() => std::from::derive_from;
