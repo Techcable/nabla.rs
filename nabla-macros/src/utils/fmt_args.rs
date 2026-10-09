@@ -133,12 +133,6 @@ impl FormatString {
                         parts.push(FormatStringPart::EscapedOpenBrace);
                         continue 'parse;
                     } else if let Some(closing_index) = remaining.find('}') {
-                        let format_start_index = current_pos();
-                        if remaining[closing_index..].starts_with("}}") {
-                            return Err(FormatStringParseError(format!(
-                                "Argument spec cannot include an escaped `}}` (start_byte = {format_start_index})",
-                            )));
-                        }
                         let format_text = &remaining[1..closing_index];
                         remaining = &remaining[closing_index + 1..];
                         let arg = if let Some((arg, spec)) = format_text.split_once(':') {
@@ -299,4 +293,16 @@ mod validate {
 }
 
 #[cfg(test)]
-mod test {}
+mod test {
+    use super::FormatString;
+
+    #[test]
+    fn braces_after_arguments() {
+        for valid in ["{{{value}}}", "{value}}}", "{{{{{value}}}}}"] {
+            assert_eq!(valid.parse::<FormatString>().unwrap().text(), valid);
+        }
+        for invalid in ["{value}}", "{value}}}}", "{value"] {
+            assert!(invalid.parse::<FormatString>().is_err(), "{invalid}");
+        }
+    }
+}
