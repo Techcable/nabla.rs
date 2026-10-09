@@ -41,7 +41,7 @@ pub fn derive_from(input: &syn::DeriveInput) -> darling::Result<TokenStream> {
             let ident = &input.ident;
             Ok(quote! {
                 #[automatically_derived]
-                impl From<#single_ty> for #ident {
+                impl ::core::convert::From<#single_ty> for #ident {
                     #[inline]
                     fn from(x: #single_ty) -> Self {
                         #ident(x)
