@@ -14,6 +14,6 @@ wrap_derive_macros! {
 }
 
 wrap_derive_macros! {
-    #[proc_macro_derive(From)]
+    #[proc_macro_derive(From, attributes(nabla, from))]
     fn derive_from() => std::from::derive_from;
 }

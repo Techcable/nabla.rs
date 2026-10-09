@@ -77,7 +77,18 @@
 ///
 /// [`thiserror::Error`]: https://docs.rs/thiserror/2/thiserror/derive.Error.html
 pub use nabla_macros::Display;
-/// Derive [`core::convert::From`] for newtype structs.
+/// Derive [`core::convert::From`] for newtype structs and enum variants.
+///
+/// On enums, put `#[from]` on the single tuple field of each variant that should
+/// have a conversion. Unmarked variants are ignored. Alternatively, put
+/// `#[from(all)]` on the enum to generate conversions for every variant; this
+/// requires every variant to have exactly one unnamed field.
+/// The namespaced aliases `#[nabla(from)]` on a field and `#[nabla(from(all))]`
+/// on an enum behave identically to the direct attributes.
+///
+/// Selected variants must have distinct source types, including after resolving
+/// type aliases, so the generated implementations do not overlap. Generic types
+/// are not currently supported.
 ///
 /// # Examples
 /// ```
@@ -89,5 +100,47 @@ pub use nabla_macros::Display;
 ///     <Wrapper as From<u32>>::from(3),
 ///     Wrapper(3)
 /// );
+/// ```
+///
+/// Selecting individual enum variants:
+/// ```
+/// #[derive(nabla::From, Debug, PartialEq)]
+/// enum Value {
+///     Number(#[from] u32),
+///     Text(#[from] String),
+///     Empty,
+/// }
+/// assert_eq!(Value::from(42_u32), Value::Number(42));
+/// assert_eq!(Value::from(String::from("hello")), Value::Text(String::from("hello")));
+/// ```
+///
+/// Selecting every variant:
+/// ```
+/// #[derive(nabla::From, Debug, PartialEq)]
+/// #[from(all)]
+/// enum Value {
+///     Number(u32),
+///     Flag(bool),
+/// }
+/// assert_eq!(Value::from(true), Value::Flag(true));
+/// ```
+///
+/// `#[from(all)]` rejects non-newtype variants:
+/// ```compile_fail
+/// #[derive(nabla::From)]
+/// #[from(all)]
+/// enum Value {
+///     Number(u32),
+///     Empty,
+/// }
+/// ```
+///
+/// Conversions from the same source type cannot target multiple variants:
+/// ```compile_fail
+/// #[derive(nabla::From)]
+/// enum Value {
+///     First(#[from] u32),
+///     Second(#[from] u32),
+/// }
 /// ```
 pub use nabla_macros::From;

@@ -10,6 +10,11 @@ A title is required for publishing a github release, so all versions should have
 
 ## Unreleased
 
+### Added
+
+- Support `#[derive(nabla::From)]` for enum newtype variants selected with a field-level `#[from]`, or every variant with enum-level `#[from(all)]`.
+- Accept the equivalent `#[nabla(from)]` and `#[nabla(from(all))]` aliases, including alongside `#[derive(nabla::Display)]`.
+
 ### Fixed
 
 - Prevent `Display` from panicking on raw field identifiers such as `r#type` (mmxtssrp).

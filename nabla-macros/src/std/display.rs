@@ -6,9 +6,8 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::ext::IdentExt;
 use syn::parse::Parser;
-use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Attribute, Member, Meta, Token};
+use syn::{Attribute, Member};
 
 use crate::utils::destructure::{DestructuredType, RefStyle};
 use crate::utils::fmt_args::{FormatArgs, FormatString, FormatStringPart};
@@ -34,31 +33,14 @@ struct DisplayVariant {
 #[expect(clippy::needless_pass_by_value, reason = "signature required by darling")]
 fn parse_display_attrs(attrs: Vec<Attribute>) -> darling::Result<Option<DisplayAttr>> {
     let mut res = None;
-    for attr in &attrs {
-        let metas = if attr.path().is_ident("display") {
-            vec![attr.meta.clone()]
-        } else if attr.path().is_ident("nabla") {
-            attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?
-                .into_iter()
-                .collect()
-        } else {
-            continue;
-        };
-        for meta in &metas {
-            if !meta.path().is_ident("display") {
-                return Err(
-                    darling::Error::unknown_field(&meta.path().to_token_stream().to_string()).with_span(meta.path()),
-                );
-            }
-            if res.is_some() {
-                return Err(
-                    darling::Error::custom("The #[display(..)] attribute should not be duplicated")
-                        .with_span(meta.path()),
-                );
-            }
-            let attr = <DisplayAttr as FromMeta>::from_meta(meta)?;
-            res = Some(attr);
+    for meta in &crate::utils::derive_attrs(&attrs, "display")? {
+        if res.is_some() {
+            return Err(
+                darling::Error::custom("The #[display(..)] attribute should not be duplicated").with_span(meta.path()),
+            );
         }
+        let attr = <DisplayAttr as FromMeta>::from_meta(meta)?;
+        res = Some(attr);
     }
     Ok(res)
 }
