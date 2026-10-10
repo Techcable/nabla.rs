@@ -21,6 +21,7 @@ A title is required for publishing a github release, so all versions should have
   - Allows format strings to capture fields in width and precision parameters and explicit arguments can use fields directly or through the `.field`/`.0` shorthand
 - Reject numeric placeholders combined with explicit positional arguments in tuple structs and variants as ambiguous
   - Numeric width and precision parameters such as `{0:1$}` no longer refer to tuple fields (utpvlmrl).
+- Pin `nabla-macros` version to match the `nabla` crate (oylvvrkx)
 
 ### Fixed
 
