@@ -5,6 +5,7 @@
 //! Available derive macros:
 //! - [`Display`](core::fmt::Display) works similar to the [`thiserror::Error`] macro,
 //!   but only implements the `Display` trait and not `std::error::Error`.
+//! - [`From`] for newtype structs and enums.
 //!
 //! [`thiserror::Error`]: https://docs.rs/thiserror/2/thiserror/derive.Error.html
 #![cfg_attr(not(feature = "std"), no_std)]

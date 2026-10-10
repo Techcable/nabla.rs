@@ -14,6 +14,7 @@ Named after the mathematical symbol for the gradient (multivariable derivative).
 Available derive macros:
 - [`Display`](https://doc.rust-lang.org/stable/core/fmt/trait.Display.html) works similar to the [`thiserror::Error`] macro,
   but only implements the `Display` trait and not `std::error::Error`.
+- [`From`](https://doc.rust-lang.org/stable/core/convert/trait.From.html) for newtype structs and enums.
 
 [`thiserror::Error`]: https://docs.rs/thiserror/2/thiserror/derive.Error.html
 
