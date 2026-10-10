@@ -236,6 +236,16 @@ fn expand_write(mut variant: WriteExpandInfo) -> darling::Result<TokenStream> {
     Ok(quote!(::core::write!(__nabla_formatter, #fmt)))
 }
 
+/// Reject display options on fields, and unknown namespaced options.
+fn check_field_attrs(fields: &darling::ast::Fields<syn::Field>) -> darling::Result<()> {
+    for field in fields.iter() {
+        if let Some(meta) = crate::utils::derive_attrs(&field.attrs, "display")?.first() {
+            return Err(darling::Error::custom("#[display(...)] is not supported on fields").with_span(meta.path()));
+        }
+    }
+    Ok(())
+}
+
 fn destructure(fields: &darling::ast::Fields<syn::Field>) -> TokenStream {
     DestructuredType::new(fields, prefix_field)
         .ref_style(Some(RefStyle::Immutable))
@@ -253,6 +263,7 @@ pub fn derive_display(input: &syn::DeriveInput) -> darling::Result<TokenStream> 
         darling::ast::Data::Enum(ref variants) => {
             let mut match_arms = Vec::new();
             for variant in variants {
+                check_field_attrs(&variant.fields)?;
                 let ident = &variant.ident;
                 let destructure = destructure(&variant.fields);
                 let attr = variant.attrs.clone().ok_or_else(|| {
@@ -276,6 +287,7 @@ pub fn derive_display(input: &syn::DeriveInput) -> darling::Result<TokenStream> 
             }
         }
         darling::ast::Data::Struct(ref fields) => {
+            check_field_attrs(fields)?;
             let ident = &derive.ident;
             let attr = derive.attrs.clone().ok_or_else(|| {
                 darling::Error::custom("Type is missing a #[display(...)] attr").with_span(&derive.ident)
@@ -326,6 +338,40 @@ mod tests {
         ] {
             let input = syn::parse_quote!(#attrs struct Example;);
             assert!(derive_display(&input).is_err());
+        }
+    }
+
+    #[test]
+    fn invalid_field_attributes() {
+        for (source, message) in [
+            (
+                "#[display(\"{0}\")] struct S(#[display(\"x\")] u32);",
+                "not supported on fields",
+            ),
+            (
+                "#[display(\"{0}\")] struct S(#[nabla(display(\"x\"))] u32);",
+                "not supported on fields",
+            ),
+            ("#[display(\"{0}\")] struct S(#[nabla(bogus)] u32);", "Unknown field"),
+            (
+                "enum E { #[display(\"{v}\")] V { #[nabla(bogus)] v: u32 } }",
+                "Unknown field",
+            ),
+        ] {
+            let input = syn::parse_str(source).unwrap();
+            let error = derive_display(&input).unwrap_err();
+            assert!(error.to_string().contains(message), "{source}: {error}");
+        }
+    }
+
+    #[test]
+    fn allows_from_field_attributes() {
+        for source in [
+            "#[display(\"{0}\")] struct S(#[nabla(from)] u32);",
+            "enum E { #[display(\"{0}\")] V(#[nabla(from)] u32) }",
+        ] {
+            let input = syn::parse_str(source).unwrap();
+            assert!(derive_display(&input).is_ok(), "{source}");
         }
     }
 }

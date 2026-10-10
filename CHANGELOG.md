@@ -26,6 +26,7 @@ A title is required for publishing a github release, so all versions should have
 - Resolve derived `Display` implementations to `core` when `core` or `write!` is shadowed or the prelude is disabled (qonoyzun).
 - Report an error instead of panicking when a `Display` placeholder contains a nested `{`, such as `"{x:{}"` (mvmyomxp).
 - Report the correct brace and byte index for unpaired braces in `Display` format strings (svqkmroy).
+- Reject `#[display(...)]` and unknown `#[nabla(...)]` options on fields in `Display` derives instead of silently ignoring them (ppyrqzun).
 
 ## 0.1.0-beta.1
 Support `#[derive(From)]` for newtype structs.
