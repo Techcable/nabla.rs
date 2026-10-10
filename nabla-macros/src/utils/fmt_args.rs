@@ -125,6 +125,12 @@ impl FormatString {
                         continue 'parse;
                     } else if let Some(closing_index) = remaining.find('}') {
                         let format_text = &remaining[1..closing_index];
+                        if let Some(nested_index) = format_text.find('{') {
+                            return Err(FormatStringParseError(format!(
+                                "Unexpected `{{` inside placeholder at byte index {}",
+                                original.len() - remaining.len() + 1 + nested_index
+                            )));
+                        }
                         remaining = &remaining[closing_index + 1..];
                         let arg = if let Some((arg, spec)) = format_text.split_once(':') {
                             FormatArgRef {
@@ -305,6 +311,17 @@ mod test {
         }
         for invalid in ["{value}}", "{value}}}}", "{value"] {
             assert!(invalid.parse::<FormatString>().is_err(), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn nested_open_brace_in_placeholder() {
+        for (input, index) in [("{x:{}", 3), ("{a{b}", 2), ("ab{x:>{width}$}", 6)] {
+            let error = input.parse::<FormatString>().unwrap_err().to_string();
+            assert!(
+                error.contains(&format!("Unexpected `{{` inside placeholder at byte index {index}")),
+                "{input}: {error}"
+            );
         }
     }
 }
