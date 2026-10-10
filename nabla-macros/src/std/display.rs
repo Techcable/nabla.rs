@@ -233,7 +233,7 @@ fn expand_write(mut variant: WriteExpandInfo) -> darling::Result<TokenStream> {
         assert!(existing.is_none());
     }
     let fmt = &variant.attr.fmt;
-    Ok(quote!(write!(__nabla_formatter, #fmt)))
+    Ok(quote!(::core::write!(__nabla_formatter, #fmt)))
 }
 
 fn destructure(fields: &darling::ast::Fields<syn::Field>) -> TokenStream {
@@ -289,8 +289,9 @@ pub fn derive_display(input: &syn::DeriveInput) -> darling::Result<TokenStream> 
         }
     };
     Ok(quote! {
-        impl core::fmt::Display for #target_name {
-            fn fmt(&self, __nabla_formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+        #[automatically_derived]
+        impl ::core::fmt::Display for #target_name {
+            fn fmt(&self, __nabla_formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 #body
             }
         }

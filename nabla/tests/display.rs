@@ -203,3 +203,47 @@ fn namespaced_display_attributes() {
     assert_eq!(Enum::Unit.to_string(), "unit");
     assert_eq!(Enum::Direct.to_string(), "direct");
 }
+
+#[test]
+fn shadowed_core_and_write() {
+    #[expect(unused_macros)]
+    macro_rules! write {
+        ($($tt:tt)*) => {
+            compile_error!("generated code used a shadowed write! macro")
+        };
+    }
+    mod core {}
+
+    #[derive(nabla::Display)]
+    #[display("{0}")]
+    struct Wrapper(u32);
+
+    assert_eq!(Wrapper(42).to_string(), "42");
+}
+
+mod no_prelude {
+    #![no_implicit_prelude]
+
+    extern crate alloc;
+    extern crate core;
+    extern crate nabla;
+
+    #[test]
+    fn display_without_prelude() {
+        #[derive(nabla::Display)]
+        enum Value {
+            #[display("{0:>1$}")]
+            Number(u32, usize),
+            #[display("{value}")]
+            Named {
+                value: bool,
+            },
+        }
+
+        core::assert_eq!(alloc::string::ToString::to_string(&Value::Number(42, 4)), "  42");
+        core::assert_eq!(
+            alloc::string::ToString::to_string(&Value::Named { value: true }),
+            "true"
+        );
+    }
+}
