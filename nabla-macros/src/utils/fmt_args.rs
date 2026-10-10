@@ -113,9 +113,11 @@ impl FormatString {
     pub fn from_str_spanned(original: &str, span: Span) -> Result<Self, FormatStringParseError> {
         let mut remaining = original;
         let mut parts = Vec::new();
-        let current_pos = || original.len() - remaining.len();
-        let unpaired_bracket =
-            |c: char| FormatStringParseError(format!("Unpaired and unescaped `{c}` at byte index {}", current_pos()));
+        // Takes `remaining` explicitly, since capturing it would copy the initial value.
+        let pos = |remaining: &str| original.len() - remaining.len();
+        let unpaired_bracket = |c: char, remaining: &str| {
+            FormatStringParseError(format!("Unpaired and unescaped `{c}` at byte index {}", pos(remaining)))
+        };
         'parse: loop {
             match remaining.chars().next() {
                 Some('{') => {
@@ -128,7 +130,7 @@ impl FormatString {
                         if let Some(nested_index) = format_text.find('{') {
                             return Err(FormatStringParseError(format!(
                                 "Unexpected `{{` inside placeholder at byte index {}",
-                                original.len() - remaining.len() + 1 + nested_index
+                                pos(remaining) + 1 + nested_index
                             )));
                         }
                         remaining = &remaining[closing_index + 1..];
@@ -145,7 +147,7 @@ impl FormatString {
                         };
                         parts.push(FormatStringPart::ArgRef(arg));
                     } else {
-                        return Err(unpaired_bracket('}'));
+                        return Err(unpaired_bracket('{', remaining));
                     }
                 }
                 Some('}') => {
@@ -153,7 +155,7 @@ impl FormatString {
                         remaining = newly_remaining;
                         parts.push(FormatStringPart::EscapedCloseBrace);
                     } else {
-                        return Err(unpaired_bracket('}'));
+                        return Err(unpaired_bracket('}', remaining));
                     }
                 }
                 Some(other) => {
@@ -311,6 +313,19 @@ mod test {
         }
         for invalid in ["{value}}", "{value}}}}", "{value"] {
             assert!(invalid.parse::<FormatString>().is_err(), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn unpaired_brace_errors() {
+        for (input, expected) in [
+            ("{value", "`{` at byte index 0"),
+            ("ab {value", "`{` at byte index 3"),
+            ("ab }", "`}` at byte index 3"),
+            ("{a} {b}}", "`}` at byte index 7"),
+        ] {
+            let error = input.parse::<FormatString>().unwrap_err().to_string();
+            assert!(error.contains(expected), "{input}: {error}");
         }
     }
 
