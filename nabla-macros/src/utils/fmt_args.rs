@@ -3,76 +3,74 @@
 use core::error::Error;
 use core::fmt::{Debug, Display, Formatter, Write};
 use core::str::FromStr;
+use std::collections::HashSet;
 
-use indexmap::IndexMap;
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{ToTokens, TokenStreamExt};
+use quote::ToTokens;
 use syn::ext::IdentExt;
-use syn::parse::{Parse, ParseStream};
+use syn::parse::{Parse, ParseStream, Parser};
 use syn::{Expr, Lit, LitStr, Token};
 
 /// A format specification that can be passed to [`format_args!`] and friends.
 #[derive(Debug, Clone)]
 pub struct FormatArgs {
     pub format_string: FormatString,
-    pub positional_args: Vec<TokenStream>,
-    pub keyword_args: IndexMap<Ident, TokenStream>,
+    /// The explicit arguments with shorthand expanded, including the leading comma.
+    pub args: TokenStream,
+    /// The (unraw) names of explicit named arguments.
+    pub named_args: HashSet<String>,
+    /// The first explicit positional argument, if any.
+    pub first_positional: Option<TokenStream>,
 }
 impl Parse for FormatArgs {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let literal: LitStr = input.parse()?;
         let format_string = FormatString::from_str_spanned(&literal.value(), literal.span())
             .map_err(|error| syn::Error::new(literal.span(), error))?;
+        let args = crate::utils::shorthand::expand(input, false)?;
         let mut result = FormatArgs {
             format_string,
-            positional_args: Vec::new(),
-            keyword_args: IndexMap::new(),
+            args: TokenStream::new(),
+            named_args: HashSet::new(),
+            first_positional: None,
         };
+        (|input: ParseStream<'_>| result.parse_args(input)).parse2(args.clone())?;
+        result.args = args;
+        Ok(result)
+    }
+}
+impl FormatArgs {
+    fn parse_args(&mut self, input: ParseStream<'_>) -> syn::Result<()> {
         while !input.is_empty() {
             input.parse::<Token![,]>()?;
             if input.is_empty() {
                 break;
             }
-            if input.peek(Ident::peek_any) && input.peek2(Token![=]) {
-                let key = input.call(Ident::parse_any)?.unraw();
+            if input.peek(Ident::peek_any) && input.peek2(Token![=]) && !input.peek2(Token![==]) {
+                let key = input.call(Ident::parse_any)?;
                 input.parse::<Token![=]>()?;
-                let value: Expr = input.parse()?;
-                if result
-                    .keyword_args
-                    .insert(key.clone(), value.to_token_stream())
-                    .is_some()
-                {
+                input.parse::<Expr>()?;
+                if !self.named_args.insert(key.unraw().to_string()) {
                     return Err(syn::Error::new(
                         key.span(),
                         format!("Key `{key}` is specified more than once"),
                     ));
                 }
             } else {
-                if !result.keyword_args.is_empty() {
+                if !self.named_args.is_empty() {
                     return Err(input.error("Cannot have positional arguments after keyword arguments"));
                 }
-                result.positional_args.push(input.parse::<Expr>()?.to_token_stream());
+                let positional = input.parse::<Expr>()?.to_token_stream();
+                self.first_positional.get_or_insert(positional);
             }
         }
-        Ok(result)
+        Ok(())
     }
 }
 impl ToTokens for FormatArgs {
     fn to_tokens(&self, dest: &mut TokenStream) {
-        fn insert_comma(dest: &mut TokenStream) {
-            <syn::Token![,] as Default>::default().to_tokens(dest);
-        }
         self.format_string.lit().to_tokens(dest);
-        for arg in &self.positional_args {
-            insert_comma(dest);
-            dest.append_all(arg.clone());
-        }
-        for (name, value) in &self.keyword_args {
-            insert_comma(dest);
-            dest.append(name.clone());
-            <syn::Token![=] as Default>::default().to_tokens(dest);
-            dest.append_all(value.clone());
-        }
+        dest.extend(self.args.clone());
     }
 }
 
@@ -300,10 +298,19 @@ mod test {
         for (input, expected) in [
             (r#""{x}", x = 1, x = 2"#, "specified more than once"),
             (r#""{x}", x = 1, 2"#, "positional arguments after keyword"),
+            (r#""{x}", r#x = 1, x = 2"#, "specified more than once"),
         ] {
             let error = syn::parse_str::<FormatArgs>(input).unwrap_err();
             assert!(error.to_string().contains(expected), "{error}");
         }
+    }
+
+    #[test]
+    fn explicit_argument_kinds() {
+        let args = syn::parse_str::<FormatArgs>(r#""{}", LIMIT == 3, .0 + 1, name = .value"#).unwrap();
+        assert_eq!(args.first_positional.unwrap().to_string(), "LIMIT == 3");
+        assert_eq!(args.named_args.into_iter().collect::<Vec<_>>(), ["name"]);
+        assert_eq!(args.args.to_string(), ", LIMIT == 3 , _0 + 1 , name = value");
     }
 
     #[test]

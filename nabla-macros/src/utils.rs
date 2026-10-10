@@ -2,6 +2,7 @@
 mod macros;
 pub mod destructure;
 pub mod fmt_args;
+pub mod shorthand;
 
 /// Collect direct and namespaced options for one derive, allowing other nabla derives to coexist.
 pub fn derive_attrs(attrs: &[syn::Attribute], name: &str) -> darling::Result<Vec<syn::Meta>> {

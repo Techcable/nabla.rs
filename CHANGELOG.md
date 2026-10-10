@@ -15,6 +15,13 @@ A title is required for publishing a github release, so all versions should have
 - Support `#[derive(nabla::From)]` for enum newtype variants selected with a field-level `#[from]`, or every variant with enum-level `#[from(all)]`.
 - Accept the equivalent `#[nabla(from)]` and `#[nabla(from(all))]` aliases, including alongside `#[derive(nabla::Display)]`.
 
+### Changed
+
+- Change the internal implementation of `Display` fields to use locals named after them, as thiserror does (utpvlmrl)
+  - Allows format strings to capture fields in width and precision parameters and explicit arguments can use fields directly or through the `.field`/`.0` shorthand
+- Reject numeric placeholders combined with explicit positional arguments in tuple structs and variants as ambiguous
+  - Numeric width and precision parameters such as `{0:1$}` no longer refer to tuple fields (utpvlmrl).
+
 ### Fixed
 
 - Prevent `Display` from panicking on raw field identifiers such as `r#type` (mmxtssrp).

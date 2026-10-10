@@ -14,12 +14,16 @@
 ///
 /// Each struct or enum variant can have a `#[display("fmtstr")]` attribute
 /// where `"fmtstr"` has access to the fields of the struct/variant.
-/// Explicit format arguments accept Rust expressions, including `self.field`.
-/// Named arguments override fields with the same name. When positional arguments
-/// are supplied, numeric placeholders refer to those arguments; otherwise they
-/// refer to tuple fields.
-/// Width and precision can also refer to fields, such as `{value:width$.precision$}`;
-/// these count fields must have type `usize`.
+/// As in thiserror, fields are bound to local references named after them
+/// (`_0`, `_1`, ... for tuple fields), so placeholders, width and precision
+/// parameters (`{value:width$.precision$}`), and explicit format arguments can all use them.
+/// Explicit arguments also accept the `.field` and `.0` shorthand, such as
+/// `#[display("{}", .value + 1)]`.
+///
+/// Named arguments override fields with the same name.
+/// In a tuple struct or variant, numeric placeholders such as `{0}` refer to fields,
+/// so they cannot be combined with explicit positional arguments;
+/// use a named argument instead.
 ///
 /// The `#[nabla(display(...))]` attribute means the same thing as `#[display(...)]`.
 /// This may be useful to avoid conflicts or for clarity.
@@ -71,7 +75,6 @@
 ///
 ///
 /// # Not Yet Implemented
-/// - Use of `.0` or `.field` shorthand to reference fields in format args
 /// - A `#[display(transparent)]` attribute similar to `#[error(transparent)]` in thisserror.
 ///   This can be easily emulated by `#[display("{0}")]`
 ///

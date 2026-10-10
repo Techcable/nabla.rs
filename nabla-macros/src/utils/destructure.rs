@@ -86,8 +86,6 @@ impl<F: FieldInfo> FieldInfo for &'_ F {
 pub struct DestructuredType<'a, V: DestructureTarget> {
     variant: Box<V>,
     tuple_namer: Box<dyn (Fn(usize) -> String) + 'a>,
-    #[allow(clippy::type_complexity)]
-    field_renamer: Option<Box<dyn (Fn(&str) -> String) + 'a>>,
     ref_style: Option<RefStyle>,
 }
 impl<'a, V: DestructureTarget> DestructuredType<'a, V> {
@@ -95,17 +93,12 @@ impl<'a, V: DestructureTarget> DestructuredType<'a, V> {
         DestructuredType {
             variant: Box::new(variant),
             tuple_namer: Box::new(tuple_namer),
-            field_renamer: None,
             ref_style: None,
         }
     }
 
     pub fn ref_style(&mut self, style: Option<RefStyle>) -> &mut Self {
         self.ref_style = style;
-        self
-    }
-    pub fn field_renamer(&mut self, renamer: impl Fn(&str) -> String + 'a) -> &mut Self {
-        self.field_renamer = Some(Box::new(renamer));
         self
     }
 }
@@ -132,15 +125,8 @@ impl<V: DestructureTarget> ToTokens for DestructuredType<'_, V> {
             }
             Style::Struct => {
                 let fields = self.variant.fields().map(|field| {
-                    let orig_name = field.name().expect("A struct should not have unnamed fields");
-                    let new_name = match self.field_renamer {
-                        Some(ref renamer) => {
-                            let new_name = renamer(&orig_name.to_string());
-                            Ident::new(&new_name, orig_name.span())
-                        }
-                        None => orig_name.clone(),
-                    };
-                    quote!(#orig_name: #ref_style #new_name)
+                    let name = field.name().expect("A struct should not have unnamed fields");
+                    quote!(#name: #ref_style #name)
                 });
                 quote!({
                     #(#fields,)*

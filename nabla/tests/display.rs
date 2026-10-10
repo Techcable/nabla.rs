@@ -59,7 +59,7 @@ fn explicit_format_arguments() {
     struct Tuple(u32);
 
     #[derive(nabla::Display)]
-    #[display("{0}", self.0 + 1)]
+    #[display("{}", self.0 + 1)]
     struct ExplicitTuple(u32);
 
     #[derive(nabla::Display)]
@@ -98,7 +98,7 @@ fn dynamic_width_and_precision() {
     }
 
     #[derive(nabla::Display)]
-    #[display("{0:1$.2$}")]
+    #[display("{0:width$.precision$}", width = .1, precision = .2)]
     struct Tuple(f64, usize, usize);
 
     #[derive(nabla::Display)]
@@ -232,7 +232,7 @@ mod no_prelude {
     fn display_without_prelude() {
         #[derive(nabla::Display)]
         enum Value {
-            #[display("{0:>1$}")]
+            #[display("{0:>width$}", width = .1)]
             Number(u32, usize),
             #[display("{value}")]
             Named {
@@ -246,4 +246,49 @@ mod no_prelude {
             "true"
         );
     }
+}
+
+#[test]
+fn fields_in_explicit_arguments() {
+    const OFFSET: u32 = 100;
+
+    #[derive(nabla::Display)]
+    enum Enum {
+        #[display("{} {}", value * 2, .value + OFFSET)]
+        Named {
+            value: u32,
+        },
+        #[display("{} {} {}", _0 + 1, .1.0, .1 .1)]
+        Tuple(u32, (u8, u8)),
+        #[display("{:.1$}", .value, .r#type)]
+        Raw {
+            value: f64,
+            r#type: usize,
+        },
+    }
+
+    const LIMIT: u32 = 3;
+    #[derive(nabla::Display)]
+    #[display("{value} {} {}", LIMIT == 3, *.value == LIMIT)]
+    struct Comparisons {
+        value: u32,
+    }
+
+    assert_eq!(Enum::Named { value: 2 }.to_string(), "4 102");
+    assert_eq!(Enum::Tuple(1, (2, 3)).to_string(), "2 2 3");
+    assert_eq!(Enum::Raw { value: 1.25, r#type: 1 }.to_string(), "1.2");
+    assert_eq!(Comparisons { value: 1 }.to_string(), "1 true false");
+}
+
+#[test]
+fn placeholders_capture_variables() {
+    const GREETING: &str = "hello";
+
+    #[derive(nabla::Display)]
+    #[display("{GREETING} {value}")]
+    struct Captures {
+        value: u32,
+    }
+
+    assert_eq!(Captures { value: 1 }.to_string(), "hello 1");
 }
