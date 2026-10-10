@@ -10,6 +10,17 @@ A title is required for publishing a github release, so all versions should have
 
 ## Unreleased
 
+## 0.1.0 - 2026-10-09
+Improve `Display` argument handling.
+
+Improved handling of display arguments and many other fixes,
+largely caught and fixed by LLMs.
+
+In particular, the implementation of`#[derive(nabla::Display)]`
+has been brought closer to the implementation of `#[derive(thiserror::Error)]`
+
+Also support `#[derive(From)]` for enums.
+
 ### Added
 
 - Support `#[derive(nabla::From)]` for enum newtype variants selected with a field-level `#[from]`, or every variant with enum-level `#[from(all)]`.

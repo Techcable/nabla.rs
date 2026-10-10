@@ -6,8 +6,7 @@ members = [
 ]
 
 [workspace.package]
-# Make sure to update pinned workspace deps when this crates
-version = "0.1.0-beta.1"
+version = "0.1.0"
 authors = ["Techcable"]
 edition = "2024"
 # Rust 1.71 - syn@3.0.0
@@ -46,7 +45,7 @@ syn = "3"
 
 ## workspace deps
 
-nabla-macros = { path = "nabla-macros", version = "=0.1.0-beta.1" }
+nabla-macros = { path = "nabla-macros", version = "=0.1.0" }
 
 ## Define lints which should be shared across all crates in `[workspace.lints]`.
 ## Cargo places limits on inheritance overrides of lints,
