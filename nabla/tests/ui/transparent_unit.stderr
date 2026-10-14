@@ -1,0 +1,5 @@
+error: #[display(transparent)] requires exactly one field
+ --> tests/ui/transparent_unit.rs:2:11
+  |
+2 | #[display(transparent)]
+  |           ^^^^^^^^^^^

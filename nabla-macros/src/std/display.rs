@@ -47,15 +47,20 @@ fn parse_display_attrs(attrs: Vec<Attribute>) -> darling::Result<Option<DisplayA
 }
 
 #[derive(Debug, Clone)]
-struct DisplayAttr {
-    fmt: FormatArgs,
+enum DisplayAttr {
+    Format(FormatArgs),
+    /// Forward to the `Display` impl of the single field, like `#[error(transparent)]` in thiserror.
+    Transparent(Span),
 }
 impl FromMeta for DisplayAttr {
     fn from_meta(meta: &syn::Meta) -> darling::Result<Self> {
         let list = meta.require_list()?;
-        Ok(Self {
-            fmt: syn::parse2(list.tokens.clone())?,
-        })
+        if let Ok(ident) = syn::parse2::<Ident>(list.tokens.clone())
+            && ident == "transparent"
+        {
+            return Ok(Self::Transparent(ident.span()));
+        }
+        Ok(Self::Format(syn::parse2(list.tokens.clone())?))
     }
 }
 
@@ -153,9 +158,21 @@ fn field_local(index: usize, field: &syn::Field) -> Ident {
 }
 
 fn expand_write(fields: &darling::ast::Fields<syn::Field>, attr: &DisplayAttr) -> darling::Result<TokenStream> {
+    let args = match *attr {
+        DisplayAttr::Format(ref args) => args,
+        DisplayAttr::Transparent(span) => {
+            let [ref field] = fields.fields[..] else {
+                return Err(
+                    darling::Error::custom("#[display(transparent)] requires exactly one field").with_span(&span),
+                );
+            };
+            let local = field_local(0, field);
+            return Ok(quote!(::core::fmt::Display::fmt(#local, __nabla_formatter)));
+        }
+    };
     let mut bindings = IndexMap::new();
-    let mut fmt = attr.fmt.clone();
-    fmt.format_string = rewrite_fmt_str(&attr.fmt, fields, &mut bindings)?;
+    let mut fmt = args.clone();
+    fmt.format_string = rewrite_fmt_str(args, fields, &mut bindings)?;
     let write = quote!(::core::write!(__nabla_formatter, #fmt));
     Ok(if bindings.is_empty() {
         write
@@ -313,6 +330,28 @@ mod tests {
             let input = syn::parse_str(source).unwrap();
             let error = derive_display(&input).unwrap_err();
             assert!(error.to_string().contains(message), "{source}: {error}");
+        }
+    }
+
+    #[test]
+    fn transparent_field_count() {
+        for source in [
+            "#[display(transparent)] struct S;",
+            "#[display(transparent)] struct S(u32, u32);",
+            "#[display(transparent)] struct S { a: u32, b: u32 }",
+            "enum E { #[display(transparent)] V }",
+            "enum E { #[nabla(display(transparent))] V(u32, u32) }",
+        ] {
+            let input = syn::parse_str(source).unwrap();
+            let error = derive_display(&input).unwrap_err();
+            assert!(error.to_string().contains("exactly one field"), "{source}: {error}");
+        }
+        for source in [
+            "#[display(transparent, \"x\")] struct S(u32);",
+            "#[display(transparent = 1)] struct S(u32);",
+        ] {
+            let input = syn::parse_str(source).unwrap();
+            assert!(derive_display(&input).is_err(), "{source}");
         }
     }
 

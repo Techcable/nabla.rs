@@ -26,6 +26,11 @@
 /// so they cannot be combined with explicit positional arguments;
 /// use a named argument instead.
 ///
+/// A struct or variant with exactly one field can use `#[display(transparent)]`
+/// to forward to the `Display` implementation of that field,
+/// like `#[error(transparent)]` in thiserror.
+/// Unlike `#[display("{0}")]`, this preserves formatter options such as width and alignment.
+///
 /// The `#[nabla(display(...))]` attribute means the same thing as `#[display(...)]`.
 /// This may be useful to avoid conflicts or for clarity.
 ///
@@ -73,11 +78,22 @@
 ///     "IO error message",
 /// )
 /// ```
+/// Using `#[display(transparent)]`:
+/// ```
+/// #[derive(nabla::Display, Debug)]
+/// #[display(transparent)]
+/// struct Name(&'static str);
 ///
-///
-/// # Not Yet Implemented
-/// - A `#[display(transparent)]` attribute similar to `#[error(transparent)]` in thisserror.
-///   This can be easily emulated by `#[display("{0}")]`
+/// #[derive(nabla::Display, Debug)]
+/// enum Value {
+///     #[display(transparent)]
+///     Number { value: u32 },
+///     #[display("<empty>")]
+///     Empty,
+/// }
+/// assert_eq!(format!("{:>5}", Name("bob")), "  bob");
+/// assert_eq!(Value::Number { value: 7 }.to_string(), "7");
+/// ```
 ///
 /// [`thiserror::Error`]: https://docs.rs/thiserror/2/thiserror/derive.Error.html
 pub use nabla_macros::Display;

@@ -292,3 +292,40 @@ fn placeholders_capture_variables() {
 
     assert_eq!(Captures { value: 1 }.to_string(), "hello 1");
 }
+#[test]
+fn transparent() {
+    #[derive(nabla::Display)]
+    #[display(transparent)]
+    struct Tuple(u32);
+
+    #[derive(nabla::Display)]
+    #[nabla(display(transparent))]
+    struct Named {
+        r#type: &'static str,
+    }
+
+    #[derive(nabla::Display)]
+    enum Enum {
+        #[display(transparent)]
+        Tuple(f64),
+        #[display(transparent)]
+        Named {
+            inner: Named,
+        },
+        #[display("other")]
+        Other,
+    }
+
+    assert_eq!(Tuple(42).to_string(), "42");
+    assert_eq!(format!("{:>4}", Tuple(7)), "   7");
+    assert_eq!(Named { r#type: "x" }.to_string(), "x");
+    assert_eq!(format!("{:.2}", Enum::Tuple(1.0)), "1.00");
+    assert_eq!(
+        Enum::Named {
+            inner: Named { r#type: "y" }
+        }
+        .to_string(),
+        "y"
+    );
+    assert_eq!(Enum::Other.to_string(), "other");
+}
