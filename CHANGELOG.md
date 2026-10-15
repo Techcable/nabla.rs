@@ -10,6 +10,9 @@ A title is required for publishing a github release, so all versions should have
 
 ## Unreleased
 
+## v0.1.1 - 2026-10-15
+Support `#[display(transparent)]` attribute.
+
 ### Added
 
 - Support `#[display(transparent)]` on structs and enum variants with exactly one field (vnxousrp)
